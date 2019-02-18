@@ -1,12 +1,20 @@
 package com.appsdevelopblog.app.ws.ui.controller;
 
+import com.appsdevelopblog.app.ws.exceptions.UserServiceException;
 import com.appsdevelopblog.app.ws.service.UserService;
 import com.appsdevelopblog.app.ws.shared.dto.UserDto;
 import com.appsdevelopblog.app.ws.ui.model.request.UserDetailsRequestModel;
+import com.appsdevelopblog.app.ws.ui.model.response.ErrorMessages;
+import com.appsdevelopblog.app.ws.ui.model.response.OperationStatusModel;
+import com.appsdevelopblog.app.ws.ui.model.response.RequestOperationStatus;
 import com.appsdevelopblog.app.ws.ui.model.response.UserRest;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @RestController
 @RequestMapping("users")//http://localhost:8080/users
@@ -16,15 +24,25 @@ public class UserController {
     @Autowired
     UserService userService;
 
-    @GetMapping
-    public String getUser() {
-        return "get user was called q123123";
-    }
-
-    @PostMapping
-    public UserRest createUser(@RequestBody UserDetailsRequestModel userDetails) {
+    @GetMapping(path = "/{id}",
+            produces = {MediaType.APPLICATION_XML_VALUE, MediaType.APPLICATION_JSON_VALUE})
+    public UserRest getUser(@PathVariable String id) {
         UserRest returnValue = new UserRest();
 
+        UserDto userDto = userService.getUserByUserId(id);
+        BeanUtils.copyProperties(userDto, returnValue);
+        return returnValue;
+    }
+
+    @PostMapping(
+            consumes = {MediaType.APPLICATION_XML_VALUE, MediaType.APPLICATION_JSON_VALUE},
+            produces = {MediaType.APPLICATION_XML_VALUE, MediaType.APPLICATION_JSON_VALUE}
+    )
+
+    public UserRest createUser(@RequestBody UserDetailsRequestModel userDetails) throws Exception {
+        UserRest returnValue = new UserRest();
+        if (userDetails.getFirstName().isEmpty())
+            throw new UserServiceException(ErrorMessages.MISSING_REQUIRED_FIELD.getErrorMessage());
         UserDto userDto = new UserDto();
         BeanUtils.copyProperties(userDetails, userDto);
 
@@ -34,13 +52,40 @@ public class UserController {
         return returnValue;
     }
 
-    @PutMapping
-    public String updateUser() {
-        return "update user was callled";
+    @PutMapping(path = "/{id}",
+            consumes = {MediaType.APPLICATION_XML_VALUE, MediaType.APPLICATION_JSON_VALUE},
+            produces = {MediaType.APPLICATION_XML_VALUE, MediaType.APPLICATION_JSON_VALUE}
+    )
+    public UserRest updateUser(@PathVariable String id, @RequestBody UserDetailsRequestModel userDetails) {
+
+        UserRest returnValue = new UserRest();
+        UserDto userDto = new UserDto();
+        BeanUtils.copyProperties(userDetails, userDto);
+
+        UserDto updateUser = userService.updateUser(id, userDto);
+        BeanUtils.copyProperties(updateUser, returnValue);
+        return returnValue;
     }
 
     @DeleteMapping
-    public String deleteUser() {
-        return "delete user was called";
+    public OperationStatusModel deleteUser(@PathVariable String id) {
+        OperationStatusModel returnValue = new OperationStatusModel();
+        returnValue.setOpenrationName(RequestOperationName.DELETE.name());
+        userService.deleteUser(id);
+        returnValue.setOpenrationResult(RequestOperationStatus.SUCCESS.name());
+        return returnValue;
+    }
+
+    @GetMapping(produces = {MediaType.APPLICATION_XML_VALUE, MediaType.APPLICATION_JSON_VALUE})
+    public List<UserRest> getUser(@RequestParam(value = "page", defaultValue = "1") int page, @RequestParam(value = "limit", defaultValue = "25") int limit) {
+        List<UserRest> returnValue = new ArrayList<>();
+        List<UserDto> users = userService.getUsers(page, limit);
+
+        for (UserDto userDto : users) {
+            UserRest userModel = new UserRest();
+            BeanUtils.copyProperties(userDto, userModel);
+            returnValue.add(userModel);
+        }
+        return returnValue;
     }
 }
